@@ -83,7 +83,12 @@ class IntBlock(nn.Module):
                                      layer_.input_symmetric)[0] *
                            (2**layer_.input_fraclen)).int().float()
                     res = layer_(res)
-                    res.div_(2**(layer_.weight_fraclen + layer_.input_fraclen))
+                    # res.div_(2**(layer_.weight_fraclen + layer_.input_fraclen))
+                    output_fraclen = 2**(layer_.weight_fraclen + layer_.input_fraclen)
+                    N = torch.numel(output_fraclen)
+                    num_elements = torch.numel(res)
+                    output_fraclen = output_fraclen.repeat_interleave(int(num_elements/N)).reshape(res.size())
+                    res.div_(output_fraclen)
                 else:
                     res = layer_(res)
             setattr(res, 'output_fraclen',
@@ -91,12 +96,17 @@ class IntBlock(nn.Module):
             if self.residual_connection:
                 res_fraclen = res.output_fraclen
                 x_fraclen = x.output_fraclen
-                output_fraclen = max(res_fraclen, x_fraclen)
-                res = res * 2**output_fraclen
-                x = x * 2**output_fraclen
+                # output_fraclen = torch.maximum(res_fraclen, x_fraclen)
+                output_fraclen = res_fraclen
+                temp_output_fraclen = 2**output_fraclen
+                N = torch.numel(temp_output_fraclen)
+                num_elements = torch.numel(x)
+                temp_output_fraclen = temp_output_fraclen.repeat_interleave(int(num_elements/N)).reshape(x.size())
+                res = res * 2**temp_output_fraclen
+                x = x * 2**temp_output_fraclen
                 res += x
                 res = torch.clamp(res, max=(1 << 31) - 1, min=-(1 << 31) + 1)
-                res = res / 2**output_fraclen
+                res = res / 2**temp_output_fraclen
             else:
                 x = (fix_quant(x, 8, self.shortcut[0].input_fraclen, 1,
                                self.shortcut[0].input_symmetric)[0] *
@@ -105,15 +115,24 @@ class IntBlock(nn.Module):
                 setattr(
                     x, 'output_fraclen', self.shortcut[-1].weight_fraclen +
                     self.shortcut[-1].input_fraclen)
-                x.div_(2**x.output_fraclen)
+                temp_output_fraclen = 2**x.output_fraclen
+                N = torch.numel(temp_output_fraclen)
+                num_elements = torch.numel(x)
+                temp_output_fraclen = temp_output_fraclen.repeat_interleave(int(num_elements/N)).reshape(x.size())
+                x.div_(2**temp_output_fraclen)
                 res_fraclen = res.output_fraclen
                 x_fraclen = x.output_fraclen
-                output_fraclen = max(res_fraclen, x_fraclen)
-                res = res * 2**output_fraclen
-                x = x * 2**output_fraclen
+                # output_fraclen = torch.maximum(res_fraclen, x_fraclen)
+                output_fraclen = res_fraclen
+                temp_output_fraclen = 2**x.output_fraclen
+                N = torch.numel(temp_output_fraclen)
+                num_elements = torch.numel(x)
+                temp_output_fraclen = temp_output_fraclen.repeat_interleave(int(num_elements/N)).reshape(x.size())
+                res = res * 2**temp_output_fraclen
+                x = x * 2**temp_output_fraclen
                 res += x
                 res = torch.clamp(res, max=(1 << 31) - 1, min=-(1 << 31) + 1)
-                res = res / 2**output_fraclen
+                res = res / 2**temp_output_fraclen
             res = self.post_relu(res)
             setattr(res, 'output_fraclen', output_fraclen)
         return res
@@ -396,7 +415,13 @@ class IntModel(nn.Module):
                     x = layer_(x)
                     output_fraclen = layer_.weight_fraclen + layer_.input_fraclen
                 setattr(x, 'output_fraclen', output_fraclen)
-            x.div_(2**x.output_fraclen)
+            # x.div_(2**x.output_fraclen)
+            output_fraclen = x.output_fraclen
+            output_fraclen = 2**output_fraclen
+            N = torch.numel(output_fraclen)
+            num_elements = torch.numel(x)
+            output_fraclen = output_fraclen.repeat_interleave(int(num_elements/N)).reshape(x.size())
+            x.div_(output_fraclen)
             for idx, n in enumerate(self.block_setting):
                 for i in range(n):
                     blk = getattr(self, f'stage_{idx}_layer_{i}')

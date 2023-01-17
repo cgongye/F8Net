@@ -593,7 +593,12 @@ class ReLUClipFXQConvBN(nn.Module):
         else:
             weight = self.quant(self.float_weight * avgpool_scale, w_wl,
                                 weight_fraclen, 0, True, self.floating)
-        int_weight = (weight * (2**weight_fraclen)).int()
+        # int_weight = (weight * (2**weight_fraclen)).int()
+        weight_fraclen = 2**weight_fraclen
+        N = torch.numel(weight_fraclen)
+        num_weights = torch.numel(weight)
+        weight_fraclen = weight_fraclen.repeat_interleave(int(num_weights/N)).reshape(weight.size())
+        int_weight = (weight*weight_fraclen).int()
         return int_weight
 
     @property
@@ -610,8 +615,8 @@ class ReLUClipFXQConvBN(nn.Module):
                                     max=x_wl - int(self.double_side),
                                     min=0)
         bias, _ = fix_quant(self.float_bias * avgpool_scale, 32,
-                            input_fraclen + weight_fraclen)
-        int_bias = (bias * (2**(input_fraclen + weight_fraclen))).int()
+                            input_fraclen[0] + weight_fraclen)
+        int_bias = (bias * (2**(input_fraclen[0] + weight_fraclen))).int()
         return int_bias
 
     def set_metric_func(self):
@@ -621,7 +626,7 @@ class ReLUClipFXQConvBN(nn.Module):
                 input_along_axis = (0, 1, 2, 3)
             elif self.format_type == 'per_channel':
                 weight_along_axis = (1, 2, 3)
-                input_along_axis = (0, 2, 3)
+                input_along_axis = (0,1, 2, 3)
             else:
                 raise NotImplementedError
             if self.metric == 'std':
@@ -652,7 +657,7 @@ class ReLUClipFXQConvBN(nn.Module):
             elif self.format_type == 'per_channel':
                 self.register_buffer(
                     'input_fraclen',
-                    torch.ones(self.conv.in_channels).to(
+                    torch.ones(1).to(
                         self.conv.weight.device) * x_fl)
             else:
                 raise NotImplementedError
@@ -1072,7 +1077,12 @@ class ReLUClipFXQLinear(nn.Linear):
         else:
             weight = self.quant(self.float_weight, w_wl, weight_fraclen, 0,
                                 True, self.floating)
-        int_weight = (weight * (2**weight_fraclen)).int()
+        # int_weight = (weight * (2**weight_fraclen)).int()
+        weight_fraclen = 2**weight_fraclen
+        N = torch.numel(weight_fraclen)
+        num_weights = torch.numel(weight)
+        weight_fraclen = weight_fraclen.repeat_interleave(int(num_weights/N)).reshape(weight.size())
+        int_weight = (weight*weight_fraclen).int()
         return int_weight
 
     @property

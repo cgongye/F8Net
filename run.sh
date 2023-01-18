@@ -1,6 +1,6 @@
 #!/bin/bash
 cfg=$1
-bs=${2:-256}
+bs=128
 echo "Total batch size: " $bs
 if [ ! -f $cfg ]; then
     echo "Config not found!"

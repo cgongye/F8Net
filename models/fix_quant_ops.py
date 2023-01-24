@@ -16,6 +16,7 @@ def bn_calib(m):
 
 def fraclen_gridsearch(input, wl, align_dim, signed):
     err_list = []
+    # if per channel
     for fl in range(wl + 1 - int(signed)):
         res, _ = fix_quant(
             input, wl,
@@ -593,12 +594,12 @@ class ReLUClipFXQConvBN(nn.Module):
         else:
             weight = self.quant(self.float_weight * avgpool_scale, w_wl,
                                 weight_fraclen, 0, True, self.floating)
-        # int_weight = (weight * (2**weight_fraclen)).int()
-        weight_fraclen = 2**weight_fraclen
-        N = torch.numel(weight_fraclen)
-        num_weights = torch.numel(weight)
-        weight_fraclen = weight_fraclen.repeat_interleave(int(num_weights/N)).reshape(weight.size())
-        int_weight = (weight*weight_fraclen).int()
+        int_weight = (weight * (2**weight_fraclen)[:, None, None, None]).int()
+        # weight_fraclen = 2**weight_fraclen
+        # N = torch.numel(weight_fraclen)
+        # num_weights = torch.numel(weight)
+        # weight_fraclen = weight_fraclen.repeat_interleave(int(num_weights/N)).reshape(weight.size())
+        # int_weight = (weight*weight_fraclen).int()
         return int_weight
 
     @property
@@ -1077,12 +1078,12 @@ class ReLUClipFXQLinear(nn.Linear):
         else:
             weight = self.quant(self.float_weight, w_wl, weight_fraclen, 0,
                                 True, self.floating)
-        # int_weight = (weight * (2**weight_fraclen)).int()
-        weight_fraclen = 2**weight_fraclen
-        N = torch.numel(weight_fraclen)
-        num_weights = torch.numel(weight)
-        weight_fraclen = weight_fraclen.repeat_interleave(int(num_weights/N)).reshape(weight.size())
-        int_weight = (weight*weight_fraclen).int()
+        int_weight = (weight * (2**weight_fraclen)[:, None]).int()
+        # weight_fraclen = 2**weight_fraclen
+        # N = torch.numel(weight_fraclen)
+        # num_weights = torch.numel(weight)
+        # weight_fraclen = weight_fraclen.repeat_interleave(int(num_weights/N)).reshape(weight.size())
+        # int_weight = (weight*weight_fraclen).int()
         return int_weight
 
     @property
